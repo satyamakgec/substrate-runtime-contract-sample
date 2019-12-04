@@ -37,6 +37,11 @@ decl_storage! {
 		Something get(fn something): Option<u32>;
 
 		FooStore get(fn foo): Option<Foo>;
+
+		LooStore get(fn loo): map (u8, T::AccountId) => Foo;
+
+		PooStore get(fn poo): linked_map T::AccountId => Foo; 
+		LinkedCounter get(fn linked_counter): u32;
 	}
 }
 
@@ -73,6 +78,32 @@ decl_module! {
 			  };
 
 			FooStore::put(foo);
+			Ok(())
+		}
+
+		pub fn store_loo(origin, address: T::AccountId, index: u8, data: Vec<u8>, id: u32) -> Result {
+			let _who = ensure_signed(origin)?;
+
+			let foo = Foo {
+				id,
+				data,
+			};
+
+			<LooStore<T>>::insert((index, address), foo);
+			Ok(())
+		}
+
+		pub fn store_poo(origin, address: T::AccountId, data: Vec<u8>, id: u32) -> Result {
+			let _who = ensure_signed(origin)?;
+
+			let foo = Foo {
+				id,
+				data,
+			};
+
+			<PooStore<T>>::insert(address, foo);
+			let counter = Self::linked_counter() + 1u32;
+			LinkedCounter::put(counter);
 			Ok(())
 		}
 	}

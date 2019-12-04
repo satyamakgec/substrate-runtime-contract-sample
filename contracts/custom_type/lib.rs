@@ -2,6 +2,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use scale::KeyedVec as _;
+use scale::{ Encode };
 use ink_prelude::{
     format,
     vec::Vec,
@@ -29,6 +30,18 @@ mod hashing {
     pub fn twox_128(data: &[u8]) -> [u8; 16] {
         let mut r: [u8; 16] = [0; 16];
         twox_128_into(data, &mut r);
+        r
+    }
+
+    /// Do a Blake2 256-bit hash and place result in `dest`.
+    pub fn blake2_256_into(data: &[u8], dest: &mut [u8; 32]) {
+        dest.copy_from_slice(blake2_rfc::blake2b::blake2b(32, &[], data).as_bytes());
+    }
+
+    /// Do a Blake2 256-bit hash and return result.
+    pub fn blake2_256(data: &[u8]) -> [u8; 32] {
+        let mut r = [0; 32];
+        blake2_256_into(data, &mut r);
         r
     }
 }
@@ -74,6 +87,74 @@ mod custom_type {
 
             // Attempt to read and decode the value directly from the runtime storage
             let result = self.env().get_runtime_storage::<Foo>(&key[..]);
+            match result {
+                Ok(foo) => {
+                    // Return the successfully decoded instance of `Foo`
+                    Some(foo)
+                },
+                Err(err) => {
+                    // Either the key did not exist or it failed to decode.
+                    // Print the reason for the error and return None.
+                    // *Note:* `println` should only be used for debugging, not in production contracts.
+                    self.env().println(&format!("Error reading runtime storage: {:?}", err));
+                    None
+                }
+            }
+        }
+
+        #[ink(message)]
+        fn read_custom_runtime_map(&self, index: u8, address: AccountId) -> Option<Foo> {
+            // Twox128(module_prefix) ++ Twox128(storage_prefix) ++ Hasher(encode(key))
+            let module_prefix = hashing::twox_128(&b"TemplateModule"[..]);
+            let storage_prefix = hashing::twox_128(&b"LooStore"[..]);
+            let hashed_key = hashing::blake2_256(&(index,address).encode());
+
+            let mut storage_key = Vec::with_capacity(
+			    module_prefix.len() + storage_prefix.len() + hashed_key.as_ref().len()
+		    );
+
+            storage_key.extend_from_slice(&module_prefix[..]);
+            storage_key.extend_from_slice(&storage_prefix[..]);
+            storage_key.extend_from_slice(hashed_key.as_ref());
+
+            self.env().println(&format!("Storage key: {:?}", storage_key));
+
+            // Attempt to read and decode the value directly from the runtime storage
+            let result = self.env().get_runtime_storage::<Foo>(&storage_key[..]);
+            match result {
+                Ok(foo) => {
+                    // Return the successfully decoded instance of `Foo`
+                    Some(foo)
+                },
+                Err(err) => {
+                    // Either the key did not exist or it failed to decode.
+                    // Print the reason for the error and return None.
+                    // *Note:* `println` should only be used for debugging, not in production contracts.
+                    self.env().println(&format!("Error reading runtime storage: {:?}", err));
+                    None
+                }
+            }
+        }
+
+        #[ink(message)]
+        fn read_custom_runtime_linked_map(&self, address: AccountId) -> Option<Foo> {
+            // Twox128(module_prefix) ++ Twox128(storage_prefix) ++ Hasher(encode(key))
+            let module_prefix = hashing::twox_128(&b"TemplateModule"[..]);
+            let storage_prefix = hashing::twox_128(&b"PooStore"[..]);
+            let hashed_key = hashing::blake2_256(&address.encode());
+
+            let mut storage_key = Vec::with_capacity(
+			    module_prefix.len() + storage_prefix.len() + hashed_key.as_ref().len()
+		    );
+
+            storage_key.extend_from_slice(&module_prefix[..]);
+            storage_key.extend_from_slice(&storage_prefix[..]);
+            storage_key.extend_from_slice(hashed_key.as_ref());
+
+            self.env().println(&format!("Storage key: {:?}", storage_key));
+
+            // Attempt to read and decode the value directly from the runtime storage
+            let result = self.env().get_runtime_storage::<Foo>(&storage_key[..]);
             match result {
                 Ok(foo) => {
                     // Return the successfully decoded instance of `Foo`
